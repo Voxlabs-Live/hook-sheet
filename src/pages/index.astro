@@ -1,0 +1,302 @@
+---
+import ToolLayout from "../layouts/ToolLayout.astro";
+import LoadingStages from "../components/LoadingStages.astro";
+import RateLimitWall from "../components/RateLimitWall.astro";
+import HookResult from "../components/HookResult.astro";
+import { HOOK_SAMPLES } from "../fixtures/studio-north";
+
+const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
+---
+<ToolLayout
+  toolName="Hook Sheet"
+  description="Paste your client's top hooks. Get them ranked + classified by 26 hook patterns + 20 new niche-specific hooks ready to film. Part of the Agency Vibe-Coding Kit."
+  repoUrl={REPO_URL}
+>
+  <h1 class="tool-title">
+    Turn last week's top hooks into <em>next week's shot list</em>.
+  </h1>
+  <p class="tool-lede">
+    Paste 5–10 hooks from one client account. The tool classifies each by a
+    26-pattern hook taxonomy, surfaces the patterns the client is NOT using
+    that fit the niche, and returns 20 new ready-to-film hooks.
+  </p>
+
+  <section class="card">
+    <div class="samples">
+      <span class="samples__label">Try a sample:</span>
+      {HOOK_SAMPLES.map((s) => (
+        <button class="btn btn--ghost btn--small" data-sample={s.id}>
+          {s.client}
+        </button>
+      ))}
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="clientNiche">
+        Client niche
+        <span class="field-hint">A short description — vertical, location, positioning</span>
+      </label>
+      <input
+        class="input"
+        id="clientNiche"
+        name="clientNiche"
+        placeholder="e.g. Beauty / lash extension studio in Berlin (premium, craft-forward)"
+      />
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="topHooks">
+        Top hooks (one per line)
+        <span class="field-hint">5–10 hooks works best. View counts in [brackets] are stripped automatically.</span>
+      </label>
+      <textarea
+        class="input"
+        id="topHooks"
+        name="topHooks"
+        placeholder={"Watching her wake up with full lashes for the first time [840K views]\nThe 90-second glue everyone's switching to\nSide by side: cluster lashes vs. classic\n..."}
+        rows="10"
+      ></textarea>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn--primary" id="submit">Generate hook sheet &rarr;</button>
+      <LoadingStages stages={["Reading", "Classifying", "Done"]} />
+      <span class="actions__hint" id="hint"></span>
+    </div>
+  </section>
+
+  <HookResult />
+  <RateLimitWall repoUrl={REPO_URL} />
+</ToolLayout>
+
+<style>
+  .field-group { margin-bottom: 1rem; }
+  .field-group:last-of-type { margin-bottom: 1.25rem; }
+</style>
+
+<script>
+  import { HOOK_SAMPLES } from "../fixtures/studio-north";
+  import type { HookResult } from "../lib/hook-types";
+  import type { ApiResponse } from "../lib/types";
+
+  const $ = (sel: string) => document.querySelector(sel) as HTMLElement | null;
+  const clientNicheEl = $("#clientNiche") as HTMLInputElement;
+  const topHooksEl = $("#topHooks") as HTMLTextAreaElement;
+  const submit = $("#submit") as HTMLButtonElement;
+  const hint = $("#hint");
+  const loading = document.querySelector(".loading") as HTMLElement | null;
+  const result = document.querySelector(".result") as HTMLElement | null;
+  const wall = document.querySelector(".wall") as HTMLElement | null;
+
+  let lastClientName = "";
+
+  document.querySelectorAll<HTMLButtonElement>("[data-sample]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.sample;
+      const sample = HOOK_SAMPLES.find((s) => s.id === id);
+      if (sample) {
+        clientNicheEl.value = sample.niche;
+        topHooksEl.value = sample.topHooks;
+        lastClientName = sample.client;
+      }
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const data = (window as any).__lastResult as HookResult | undefined;
+      if (!data) return;
+      const text =
+        btn.dataset.copy === "new" ? formatNewHooks(data) : formatFullSheet(data);
+      navigator.clipboard.writeText(text);
+      const orig = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => (btn.textContent = orig), 1400);
+    });
+  });
+
+  submit.addEventListener("click", async () => {
+    const niche = clientNicheEl.value.trim();
+    const hooks = topHooksEl.value.trim();
+    if (!niche || !hooks) {
+      (niche ? topHooksEl : clientNicheEl).focus();
+      return;
+    }
+
+    submit.disabled = true;
+    if (hint) hint.textContent = "";
+    if (result) result.hidden = true;
+    if (wall) wall.hidden = true;
+    if (loading) {
+      loading.hidden = false;
+      loading.dataset.stage = "reading";
+    }
+    const t1 = window.setTimeout(() => {
+      if (loading) loading.dataset.stage = "extracting";
+    }, 900);
+
+    try {
+      const res = await fetch("/api/classify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ clientNiche: niche, topHooks: hooks }),
+      });
+      const payload = (await res.json()) as ApiResponse<HookResult>;
+      window.clearTimeout(t1);
+
+      if (!payload.ok) {
+        if (payload.error === "rate_limit_exceeded" && wall) {
+          wall.hidden = false;
+          wall.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else if (hint) {
+          hint.textContent = payload.message;
+        }
+        return;
+      }
+
+      if (loading) loading.dataset.stage = "done";
+      (window as any).__lastResult = payload.data;
+      render(payload.data);
+      if (hint && Number.isFinite(payload.remaining) && payload.remaining >= 0) {
+        hint.textContent =
+          payload.remaining > 0
+            ? `${payload.remaining} demo run${payload.remaining === 1 ? "" : "s"} remaining`
+            : "Last demo run used — fork to keep going.";
+      }
+    } catch {
+      if (hint) hint.textContent = "Network error. Try again.";
+    } finally {
+      submit.disabled = false;
+      window.setTimeout(() => {
+        if (loading) loading.hidden = true;
+      }, 600);
+    }
+  });
+
+  function render(data: HookResult) {
+    if (!result) return;
+    result.hidden = false;
+
+    const clientEl = result.querySelector('[data-field="client"]') as HTMLElement;
+    clientEl.textContent = lastClientName || "your client";
+
+    // Ranked input hooks
+    const rankedEl = result.querySelector('[data-field="ranked"]') as HTMLElement;
+    rankedEl.innerHTML = "";
+    const rankedSorted = [...data.ranked].sort((a, b) => a.rank - b.rank);
+    rankedSorted.forEach((h) => {
+      rankedEl.appendChild(renderHookLi(h.hook, h.primary_pattern, h.secondary_patterns, h.why_it_works));
+    });
+
+    // Pattern distribution bars
+    const distEl = result.querySelector('[data-field="distribution"]') as HTMLElement;
+    distEl.innerHTML = "";
+    const maxCount = Math.max(1, ...data.pattern_distribution.map((p) => p.count));
+    data.pattern_distribution.forEach((p) => {
+      const li = document.createElement("li");
+      const label = document.createElement("span");
+      label.className = "bar-label";
+      label.textContent = p.pattern;
+      const count = document.createElement("span");
+      count.className = "bar-count";
+      count.textContent = String(p.count);
+      const track = document.createElement("span");
+      track.className = "bar-track";
+      const fill = document.createElement("span");
+      fill.className = "bar-fill";
+      fill.style.width = `${(p.count / maxCount) * 100}%`;
+      track.appendChild(fill);
+      li.appendChild(label);
+      li.appendChild(count);
+      li.appendChild(track);
+      distEl.appendChild(li);
+    });
+
+    // Blind spots
+    const blindEl = result.querySelector('[data-field="blind_spots"]') as HTMLElement;
+    blindEl.innerHTML = "";
+    data.blind_spots.forEach((p) => {
+      const li = document.createElement("li");
+      li.textContent = p;
+      blindEl.appendChild(li);
+    });
+
+    // New hooks
+    const newEl = result.querySelector('[data-field="new_hooks"]') as HTMLElement;
+    newEl.innerHTML = "";
+    data.new_hooks.forEach((h) => {
+      newEl.appendChild(renderHookLi(h.hook, h.pattern, [], h.why));
+    });
+
+    result.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function renderHookLi(
+    text: string,
+    primary: string,
+    secondary: string[],
+    why: string,
+  ): HTMLLIElement {
+    const li = document.createElement("li");
+    const t = document.createElement("p");
+    t.className = "hook-text";
+    t.textContent = text;
+    const meta = document.createElement("p");
+    meta.className = "hook-meta";
+    const primaryChip = document.createElement("span");
+    primaryChip.className = "pattern-chip pattern-chip--primary";
+    primaryChip.textContent = primary;
+    meta.appendChild(primaryChip);
+    secondary.forEach((s) => {
+      const chip = document.createElement("span");
+      chip.className = "pattern-chip";
+      chip.textContent = s;
+      meta.appendChild(chip);
+    });
+    const w = document.createElement("p");
+    w.className = "hook-why";
+    w.textContent = why;
+    li.appendChild(t);
+    li.appendChild(meta);
+    li.appendChild(w);
+    return li;
+  }
+
+  function formatNewHooks(d: HookResult): string {
+    return d.new_hooks
+      .map((h, i) => `${i + 1}. ${h.hook}\n   pattern: ${h.pattern}\n   why: ${h.why}`)
+      .join("\n\n");
+  }
+
+  function formatFullSheet(d: HookResult): string {
+    const lines: string[] = [];
+    lines.push("YOUR TOP HOOKS, RANKED");
+    lines.push("");
+    [...d.ranked]
+      .sort((a, b) => a.rank - b.rank)
+      .forEach((h) => {
+        const sec = h.secondary_patterns.length ? ` + ${h.secondary_patterns.join(", ")}` : "";
+        lines.push(`${h.rank}. "${h.hook}"`);
+        lines.push(`   pattern: ${h.primary_pattern}${sec}`);
+        lines.push(`   why: ${h.why_it_works}`);
+        lines.push("");
+      });
+
+    lines.push("PATTERN DISTRIBUTION");
+    d.pattern_distribution.forEach((p) => lines.push(`   ${p.pattern}: ${p.count}`));
+    lines.push("");
+
+    lines.push(`BLIND SPOTS: ${d.blind_spots.join(", ")}`);
+    lines.push("");
+
+    lines.push("20 NEW HOOKS TO FILM");
+    lines.push("");
+    d.new_hooks.forEach((h, i) => {
+      lines.push(`${i + 1}. ${h.hook}`);
+      lines.push(`   pattern: ${h.pattern}`);
+      lines.push(`   why: ${h.why}`);
+      lines.push("");
+    });
+    return lines.join("\n");
+  }
+</script>
