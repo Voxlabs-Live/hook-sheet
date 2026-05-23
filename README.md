@@ -45,21 +45,87 @@ A 10-minute screen recording covers the whole flow. [Watch it here](#loom-coming
 
 ## Customize the tool
 
-### Tune the taxonomy
+This repo is yours to modify. You don't have to write code — **Claude** rewrites the files for you, you paste the result back into GitHub in your browser. No terminal, no command line.
 
-Open `src/prompts/system.ts`. The 26 hook patterns are inlined in the system prompt — add your own patterns, remove ones that don't fit your verticals, or edit the descriptions to bias the classifier toward your interpretations.
+### One-time setup (≈3 minutes)
 
-### Add per-client niche presets
+1. **Download the Claude desktop app.** Go to [claude.ai/download](https://claude.ai/download). Click the download button for your operating system. On **Mac**, open the downloaded file and drag the Claude icon into your Applications folder. On **Windows**, run the installer. Sign in with your Claude account.
 
-The fixtures in `src/fixtures/studio-north.ts` are demo content. Replace them with your real clients' niche descriptions and recent top-performer hook lists to skip the paste step.
+That's it. Claude desktop is the same chat you already know from [claude.ai](https://claude.ai) — just running as an app on your computer. (If you'd rather not install anything, [claude.ai](https://claude.ai) in your browser works exactly the same way for the steps below.)
 
-### Upgrade to polished UI
+### How customizing works
 
-The kit's **Bump #1 — Claude Design Polish Guide** ($17) walks you through styling this repo with [Claude Design](https://claude.com/design). *(Available after kit purchase.)*
+Three browser tabs and one app, working together:
+
+1. **GitHub** in your browser — where your tool's code lives.
+2. **Claude desktop app** — does the rewriting.
+3. **Vercel** in your browser — auto-redeploys your live tool when you commit a change.
+
+The flow for any change is the same six steps:
+
+1. **In GitHub**, click the file you want to change (paths are in the prompts below).
+2. Click the **"Copy raw file"** icon at the top right of the file view — it copies the whole file to your clipboard.
+3. **In Claude desktop**, start a new chat. Paste the file contents. Below it, paste the prompt from this README. Hit return.
+4. Claude rewrites the file and shows you the result. Copy Claude's output.
+5. **Back in GitHub**, click the **pencil icon** at the top right of the file view (the tooltip says "Edit this file"). Select everything (`Cmd+A` on Mac, `Ctrl+A` on Windows), delete it, paste your new version.
+6. Scroll to the bottom of the page. Write a one-line summary of what changed (e.g. "Add curiosity-gap hook pattern"). Click the green **"Commit changes"** button.
+
+Vercel sees the commit and auto-redeploys your live URL in about 90 seconds. Refresh your tool to see the change.
+
+### Three starting points
+
+#### 1. Adjust the hook patterns the tool uses
+
+The tool ships with 26 hook patterns (curiosity gap, contrarian take, listicle promise, etc.) and classifies your hooks against them. Want to add patterns specific to your verticals? Remove ones you never use? Rewrite the descriptions to bias the tool toward your interpretation?
+
+**File to copy from GitHub:** `src/prompts/system.ts`
+
+> **Prompt to paste below the file contents:**
+> ```
+> The file above contains the 26 hook patterns the tool uses to classify
+> hooks. Add a new pattern called "Receipts" with this description:
+>
+> "Opens by showing concrete proof — a screenshot, an invoice, a DM, a
+> revenue chart — before saying what the post is about. Strong on
+> finance, ecom, and B2B niches; weak on lifestyle."
+>
+> Keep all other patterns as-is. Return the full updated file so I can
+> paste it back into GitHub.
+> ```
+
+Adapt the prompt — add or remove whichever patterns fit your clients.
+
+#### 2. Replace demo clients with your own
+
+The tool ships with three sample clients (Aurelia Lashes, Mantra Yoga, Dr. Eckhardt Clinic) so you can try it without setting anything up. Replace them with your real clients' niche descriptions and recent top-performing hooks so the tool starts pre-loaded for each — one click, no paste step.
+
+**File to copy from GitHub:** `src/fixtures/studio-north.ts`
+
+> **Prompt:**
+> ```
+> The file above contains three demo client fixtures. Replace them with
+> these three of mine instead:
+>
+> Client 1: [paste your client's name, their niche, and 5-10 of their
+> recent top-performing hooks here]
+>
+> Client 2: [same]
+>
+> Client 3: [same]
+>
+> Keep the file structure identical so the tool still works. Return the
+> full updated file so I can paste it back into GitHub.
+> ```
+
+#### 3. Make it look like agency work, not a starter kit
+
+For a full re-skin: the **Claude Design Brand Pass Guide** ($17) walks you through restyling this exact repo using [Claude Design](https://claude.com/design) — the guide ships handoff bundles for the entire UI. *(Available after kit purchase.)*
 
 ---
 
-## Local dev
+## Local dev (for developers only)
+
+> **Skip this section if you used the Deploy with Vercel button above.** This is for developers who want to clone the repo and run a dev server locally. If you don't know what `npm` is, you don't need this — the Customize section above is the path you want.
 
 ```sh
 git clone https://github.com/Voxlabs-Live/hook-sheet
