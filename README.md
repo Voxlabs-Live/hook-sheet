@@ -95,11 +95,13 @@ The tool ships with 26 hook patterns (curiosity gap, contrarian take, listicle p
 
 Adapt the prompt — add or remove whichever patterns fit your clients.
 
-#### 2. Replace demo clients with your own
+#### 2. Replace or remove the demo sample buttons
 
-The tool ships with three sample clients (Aurelia Lashes, Mantra Yoga, Dr. Eckhardt Clinic) so you can try it without setting anything up. Replace them with your real clients' niche descriptions and recent top-performing hooks so the tool starts pre-loaded for each — one click, no paste step.
+The tool ships with three sample clients (Aurelia Lashes, Mantra Yoga, Dr. Eckhardt Clinic) so you can try it without setting anything up. You'll almost certainly want to either swap them for your real clients' niche descriptions and recent top hooks so the tool starts pre-loaded — or remove the row entirely so your live tool starts empty.
 
 **File to copy from GitHub:** `src/fixtures/studio-north.ts`
+
+**Option A — Replace with your own:**
 
 > **Prompt:**
 > ```
@@ -116,6 +118,21 @@ The tool ships with three sample clients (Aurelia Lashes, Mantra Yoga, Dr. Eckha
 > Keep the file structure identical so the tool still works. Return the
 > full updated file so I can paste it back into GitHub.
 > ```
+
+**Option B — Remove samples entirely:**
+
+> **Prompt:**
+> ```
+> The file above defines three demo client fixtures. I don't want any
+> sample buttons in my deployed tool — users should just see empty input
+> fields.
+>
+> Rewrite the file so HOOK_SAMPLES is an empty array. Keep the HookSample
+> interface and the findHookSample function so nothing else breaks.
+> Return the full updated file so I can paste it back into GitHub.
+> ```
+
+When `HOOK_SAMPLES` is empty, the "Try a sample:" row automatically disappears from your tool — no further code changes needed.
 
 #### 3. Make it look like agency work, not a starter kit
 

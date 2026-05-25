@@ -22,14 +22,16 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
   </p>
 
   <section class="card">
-    <div class="samples">
-      <span class="samples__label">Try a sample:</span>
-      {HOOK_SAMPLES.map((s) => (
-        <button class="btn btn--ghost btn--small" data-sample={s.id}>
-          {s.client}
-        </button>
-      ))}
-    </div>
+    {HOOK_SAMPLES.length > 0 && (
+      <div class="samples">
+        <span class="samples__label">Try a sample:</span>
+        {HOOK_SAMPLES.map((s) => (
+          <button class="btn btn--ghost btn--small" data-sample={s.id}>
+            {s.client}
+          </button>
+        ))}
+      </div>
+    )}
 
     <div class="field-group">
       <label class="field-label" for="clientNiche">
