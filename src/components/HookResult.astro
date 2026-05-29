@@ -178,8 +178,8 @@
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.35rem 0;
+    gap: 0.4rem 0.5rem;
+    padding: 0.5rem 0;
   }
   .bars :global(.bar-label) {
     font-family: var(--font-mono);
@@ -188,20 +188,22 @@
   }
   .bars :global(.bar-track) {
     grid-column: 1 / -1;
-    height: 4px;
+    height: 9px;
     background: var(--surface-100);
-    border-radius: 2px;
+    border-radius: var(--radius-sm, 4px);
     overflow: hidden;
   }
   .bars :global(.bar-fill) {
     height: 100%;
     background: var(--accent-500);
+    border-radius: var(--radius-sm, 4px);
     transition: width var(--duration-base) var(--ease-smooth);
   }
   .bars :global(.bar-count) {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    color: var(--surface-500);
+    color: var(--surface-900);
+    font-weight: var(--font-weight-semibold);
   }
 
   .blind-spots {
@@ -212,13 +214,22 @@
     flex-wrap: wrap;
     gap: 0.45rem;
   }
+  /* Blind spots = gaps to fill. Dashed outline + "+" marker reads as
+     "missing / add this" — deliberately distinct from the solid-filled
+     primary-pattern chips, even though both stay in the terracotta family. */
   .blind-spots :global(li) {
     font-family: var(--font-mono);
     font-size: var(--text-sm);
     padding: 0.4rem 0.7rem;
     border-radius: var(--radius);
-    background: oklch(from var(--accent-100) l c h / 0.5);
-    color: var(--accent-800);
-    border: 1px solid oklch(from var(--accent-500) l c h / 0.3);
+    background: transparent;
+    color: var(--accent-700);
+    border: 1px dashed oklch(from var(--accent-500) l c h / 0.6);
+  }
+  .blind-spots :global(li)::before {
+    content: "+";
+    margin-right: 0.4rem;
+    color: oklch(from var(--accent-500) l c h / 0.85);
+    font-weight: var(--font-weight-semibold);
   }
 </style>
