@@ -1,11 +1,18 @@
 import type { APIRoute } from "astro";
-import { callCached, parseJson } from "../../lib/anthropic";
+import { callCached, repair, parseJson } from "../../lib/anthropic";
 import { readDemo, consumeDemo } from "../../lib/rate-limit";
 import { HOOK_SHEET_SYSTEM_PROMPT } from "../../prompts/system";
 import type { HookResult } from "../../lib/hook-types";
 import type { ApiResponse } from "../../lib/types";
+import {
+  validateHookModelOutput,
+  computeDistribution,
+  reconcileBlindSpots,
+} from "../../lib/validate";
 
 export const prerender = false;
+
+const MAX_TOKENS = 4500;
 
 export const POST: APIRoute = async ({ request }) => {
   // Step 1 — rate limit
@@ -57,13 +64,15 @@ export const POST: APIRoute = async ({ request }) => {
   // Step 3 — call Claude
   const userInput = `CLIENT NICHE:\n${clientNiche}\n\n---\n\nTOP HOOKS (one per line, optionally with [view counts] in brackets):\n${topHooks}`;
   let raw: string;
+  let stopReason: string | null;
   try {
     const result = await callCached({
       systemPrompt: HOOK_SHEET_SYSTEM_PROMPT,
       userInput,
-      maxTokens: 4500,
+      maxTokens: MAX_TOKENS,
     });
     raw = result.text;
+    stopReason = result.stopReason;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const code = msg.includes("ANTHROPIC_API_KEY")
@@ -72,25 +81,80 @@ export const POST: APIRoute = async ({ request }) => {
     return json<HookResult>({ ok: false, error: code, message: msg });
   }
 
-  // Step 4 — parse JSON
-  let data: HookResult;
-  try {
-    data = parseJson<HookResult>(raw);
-  } catch {
+  if (stopReason === "max_tokens") {
     return json<HookResult>({
       ok: false,
-      error: "parse_error",
-      message: "Claude returned non-JSON. Try again.",
+      error: "truncated",
+      message: "That input produced a response too long to finish. Trim to 5–10 hooks and try again.",
     });
   }
 
-  // Step 5 — consume one demo credit
+  // Step 4 — parse + validate; one corrective re-prompt if the model drifted
+  let data = tryParse(raw);
+  let violations = data
+    ? validateHookModelOutput(data, topHooks)
+    : [{ code: "json", message: "Return valid strict JSON only, matching the schema exactly." }];
+
+  if (violations.length > 0) {
+    try {
+      const fixed = await repair({
+        systemPrompt: HOOK_SHEET_SYSTEM_PROMPT,
+        userInput,
+        priorRaw: raw,
+        violations: violations.map((v) => v.message),
+        maxTokens: MAX_TOKENS,
+      });
+      if (fixed.stopReason !== "max_tokens") {
+        const repaired = tryParse(fixed.text);
+        if (repaired && Array.isArray(repaired.ranked) && Array.isArray(repaired.new_hooks)) {
+          const v2 = validateHookModelOutput(repaired, topHooks);
+          // Accept the repair only if it didn't make things worse.
+          if (v2.length <= violations.length) {
+            data = repaired;
+            violations = v2;
+          }
+        }
+      }
+    } catch {
+      // Swallow — deterministic post-processing below still salvages a usable result.
+    }
+  }
+
+  // Step 5 — the model-judgment fields are required; everything else we fix deterministically
+  if (
+    !data ||
+    !Array.isArray(data.ranked) ||
+    data.ranked.length === 0 ||
+    !Array.isArray(data.new_hooks) ||
+    data.new_hooks.length === 0
+  ) {
+    return json<HookResult>({
+      ok: false,
+      error: "incomplete_output",
+      message: "The tool returned an incomplete result. Please try again.",
+    });
+  }
+
+  // Step 6 — deterministic post-processing (authoritative — the model can't drift these)
+  data.pattern_distribution = computeDistribution(data.ranked);
+  data.blind_spots = reconcileBlindSpots(data.blind_spots, data.ranked);
+  if (data.new_hooks.length > 20) data.new_hooks = data.new_hooks.slice(0, 20);
+
+  // Step 7 — consume one demo credit
   await consumeDemo(request);
   const remaining =
     usage.remaining === Infinity ? -1 : Math.max(0, usage.remaining - 1);
 
   return json<HookResult>({ ok: true, data, remaining });
 };
+
+function tryParse(raw: string): HookResult | null {
+  try {
+    return parseJson<HookResult>(raw);
+  } catch {
+    return null;
+  }
+}
 
 function json<T>(payload: ApiResponse<T>): Response {
   return new Response(JSON.stringify(payload), {
