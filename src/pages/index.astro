@@ -22,6 +22,21 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
   </p>
 
   <section class="card">
+    <!-- Client library: pick a saved client, or start a new one. Niche + hooks
+         below act as the client's editable profile (autosaved once named). -->
+    <div class="client-bar">
+      <label class="field-label client-bar__label" for="clientSelect">
+        Client
+        <select class="input client-bar__select" id="clientSelect" data-client-select></select>
+      </label>
+      <div class="client-bar__actions">
+        <button type="button" class="btn btn--ghost btn--small" data-client-new>+ New client</button>
+        <button type="button" class="btn btn--ghost btn--small" data-client-duplicate>Duplicate</button>
+        <button type="button" class="btn btn--ghost btn--small" data-client-delete>Delete</button>
+      </div>
+      <p class="client-bar__status" data-client-status></p>
+    </div>
+
     {HOOK_SAMPLES.length > 0 && (
       <div class="samples">
         <span class="samples__label">Try a sample:</span>
@@ -32,6 +47,20 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
         ))}
       </div>
     )}
+
+    <div class="field-group">
+      <label class="field-label" for="clientName">
+        Client name
+        <span class="field-hint">Name this client to save the niche + hooks for next week</span>
+      </label>
+      <input
+        class="input"
+        id="clientName"
+        name="clientName"
+        placeholder="e.g. Aurelia Lashes"
+        autocomplete="off"
+      />
+    </div>
 
     <div class="field-group">
       <label class="field-label" for="clientNiche">
@@ -68,20 +97,234 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
   </section>
 
   <HookResult />
+
+  <!-- Generated-sheet history — every successful run is saved here so the 20
+       hooks survive refresh. Most-recent-first. -->
+  <section class="history" data-history hidden>
+    <header class="history__head">
+      <h2 class="history__title">Generated sheets</h2>
+      <span class="history__hint">Saved on this device. Reopen to view or re-copy.</span>
+    </header>
+    <ul class="history__list" data-history-list></ul>
+  </section>
+
   <RateLimitWall repoUrl={REPO_URL} />
+
+  <!-- Confirmation modal — replaces native confirm() for destructive actions. -->
+  <div class="confirm" data-confirm-modal hidden>
+    <div class="confirm__backdrop" data-confirm-cancel></div>
+    <div class="confirm__card" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-body">
+      <h3 class="confirm__title" id="confirm-title" data-confirm-title>Are you sure?</h3>
+      <p class="confirm__body" id="confirm-body" data-confirm-body></p>
+      <div class="confirm__actions">
+        <button type="button" class="btn btn--ghost btn--small" data-confirm-cancel>Cancel</button>
+        <button type="button" class="btn btn--small confirm__danger" data-confirm-ok>Confirm</button>
+      </div>
+    </div>
+  </div>
 </ToolLayout>
 
 <style>
   .field-group { margin-bottom: 1rem; }
   .field-group:last-of-type { margin-bottom: 1.25rem; }
+
+  /* ── Client library bar ─────────────────────────────────── */
+  .client-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) auto;
+    gap: 0.6rem 1rem;
+    align-items: end;
+    margin-bottom: 0.85rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--surface-150);
+  }
+  @media (max-width: 720px) {
+    .client-bar { grid-template-columns: 1fr; align-items: stretch; }
+  }
+  .client-bar__label { display: flex; flex-direction: column; gap: 0.3rem; margin: 0; }
+  .client-bar__select { font-family: var(--font-mono); }
+  .client-bar__actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  @media (max-width: 540px) {
+    .client-bar__actions { justify-content: flex-start; }
+  }
+  .client-bar__status {
+    grid-column: 1 / -1;
+    font-size: var(--text-sm);
+    color: var(--surface-600);
+    min-height: 1.25rem;
+    margin: 0;
+  }
+  .client-bar__status[data-state="saved"] { color: var(--surface-800); }
+  .client-bar__status[data-state="warn"] { color: var(--amber-700); }
+
+  /* Read-only sample inputs read as locked, not broken. */
+  .input[readonly] {
+    background: var(--surface-50);
+    color: var(--surface-700);
+    cursor: default;
+  }
+
+  /* ── Sheet history ──────────────────────────────────────── */
+  .history {
+    background: var(--surface-0);
+    border: 1px solid var(--surface-200);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem 1.75rem;
+    margin-top: 1.5rem;
+    box-shadow: var(--shadow-card);
+  }
+  .history__head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  .history__title {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    margin: 0;
+  }
+  .history__hint {
+    font-size: var(--text-sm);
+    color: var(--surface-500);
+  }
+  .history__list { list-style: none; padding: 0; margin: 0; }
+  .history__list :global(li) {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 0;
+    border-top: 1px solid var(--surface-150);
+  }
+  .history__list :global(li:first-child) { border-top: 0; }
+  .history__list :global(.history__open) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    text-align: left;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    min-width: 0;
+  }
+  .history__list :global(.history__client) {
+    font-weight: var(--font-weight-semibold);
+    color: var(--surface-900);
+  }
+  .history__list :global(.history__open:hover .history__client) {
+    color: var(--accent-700);
+  }
+  .history__list :global(.history__meta) {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--surface-500);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .history__list :global(.history__del) {
+    flex: none;
+    background: none;
+    border: 0;
+    padding: 0.3rem 0.5rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--surface-500);
+    cursor: pointer;
+    border-radius: var(--radius-sm, 4px);
+  }
+  .history__list :global(.history__del:hover) {
+    color: var(--accent-700);
+    background: oklch(from var(--accent-100) l c h / 0.5);
+  }
+
+  /* ── Confirmation modal ─────────────────────────────────── */
+  .confirm {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: 1.5rem;
+  }
+  /* The author `display: grid` above beats the UA `[hidden] { display:none }`
+     rule — without this the modal would be visible on load. */
+  .confirm[hidden] { display: none; }
+  .confirm__backdrop {
+    position: absolute;
+    inset: 0;
+    background: oklch(0.18 0.012 60 / 0.45);
+    backdrop-filter: blur(2px);
+  }
+  .confirm__card {
+    position: relative;
+    width: 100%;
+    max-width: 26rem;
+    background: var(--surface-0);
+    border: 1px solid var(--surface-200);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl, var(--shadow-card));
+    padding: 1.5rem 1.6rem 1.35rem;
+  }
+  .confirm__title {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    line-height: var(--leading-snug);
+    color: var(--surface-900);
+    margin: 0 0 0.55rem;
+  }
+  .confirm__body {
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+    color: var(--surface-700);
+    margin: 0 0 1.35rem;
+  }
+  .confirm__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+  }
+  .confirm__danger {
+    background: var(--accent-600);
+    color: var(--surface-0);
+  }
+  .confirm__danger:hover { background: var(--accent-700); color: var(--surface-0); }
 </style>
 
 <script>
-  import { HOOK_SAMPLES } from "../fixtures/studio-north";
+  import { HOOK_SAMPLES, HOOK_SAMPLE_CLIENTS } from "../fixtures/studio-north";
   import type { HookResult } from "../lib/hook-types";
   import type { ApiResponse } from "../lib/types";
+  import {
+    seedClientsIfNeeded,
+    listClients,
+    getClient,
+    saveClient,
+    deleteClient,
+    duplicateClient,
+    listSheets,
+    getSheet,
+    saveSheet,
+    deleteSheet,
+    getLastViewed,
+    setLastViewed,
+    isSampleId,
+    type ClientProfile,
+    type SavedSheet,
+  } from "../lib/hook-storage";
 
   const $ = (sel: string) => document.querySelector(sel) as HTMLElement | null;
+  const clientNameEl = $("#clientName") as HTMLInputElement;
   const clientNicheEl = $("#clientNiche") as HTMLInputElement;
   const topHooksEl = $("#topHooks") as HTMLTextAreaElement;
   const submit = $("#submit") as HTMLButtonElement;
@@ -90,20 +333,348 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
   const result = document.querySelector(".result") as HTMLElement | null;
   const wall = document.querySelector(".wall") as HTMLElement | null;
 
-  let lastClientName = "";
+  const clientSelect = $("[data-client-select]") as HTMLSelectElement;
+  const clientStatus = $("[data-client-status]") as HTMLElement;
+  const newClientBtn = $("[data-client-new]") as HTMLButtonElement;
+  const dupClientBtn = $("[data-client-duplicate]") as HTMLButtonElement;
+  const delClientBtn = $("[data-client-delete]") as HTMLButtonElement;
 
+  const historySection = $("[data-history]") as HTMLElement;
+  const historyList = $("[data-history-list]") as HTMLElement;
+
+  /** Id of the client currently loaded into the inputs ("" = no client / ad-hoc). */
+  let currentClientId = "";
+  /** Id of the sheet currently rendered in the result panel (null = none). */
+  let renderedSheetId: string | null = null;
+  /** Display name shown in the result header. */
+  let lastClientName = "";
+  let autosaveTimer: number | undefined;
+  let inFlight = false;
+
+  // ─── Bootstrap ──────────────────────────────────────────────────────────
+  seedClientsIfNeeded(HOOK_SAMPLE_CLIENTS);
+  populateClientSelect();
+  renderHistory();
+  restoreLastViewed();
+
+  // Flush pending edits before the page unloads so unsaved work isn't lost.
+  window.addEventListener("beforeunload", flushAutosave);
+
+  // ─── Client picker + editing ──────────────────────────────────────────────
+  function setClientStatus(message: string, state?: "saved" | "warn"): void {
+    clientStatus.textContent = message;
+    if (state) clientStatus.dataset.state = state;
+    else delete clientStatus.dataset.state;
+  }
+
+  function populateClientSelect(): void {
+    const clients = listClients();
+    clientSelect.innerHTML = "";
+    if (clients.length === 0) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "(no saved clients)";
+      clientSelect.appendChild(opt);
+      return;
+    }
+    for (const c of clients) {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      // textContent => XSS-safe with user-supplied client names.
+      opt.textContent = isSampleId(c.id) ? `${c.client_name} — sample` : c.client_name;
+      clientSelect.appendChild(opt);
+    }
+  }
+
+  /** Ensure the dropdown lists + selects the given saved client. */
+  function syncClientOption(client: ClientProfile): void {
+    let opt = [...clientSelect.options].find((o) => o.value === client.id);
+    if (!opt) {
+      opt = document.createElement("option");
+      opt.value = client.id;
+      clientSelect.appendChild(opt);
+    }
+    opt.textContent = isSampleId(client.id) ? `${client.client_name} — sample` : client.client_name;
+    clientSelect.value = client.id;
+  }
+
+  function isCurrentSample(): boolean {
+    return isSampleId(currentClientId);
+  }
+
+  /** Lock inputs when a read-only sample is loaded; unlock for editable clients. */
+  function applyReadonlyState(): void {
+    const ro = isCurrentSample();
+    clientNameEl.readOnly = ro;
+    clientNicheEl.readOnly = ro;
+    topHooksEl.readOnly = ro;
+  }
+
+  function loadClientIntoInputs(client: ClientProfile): void {
+    currentClientId = client.id;
+    clientNameEl.value = client.client_name;
+    clientNicheEl.value = client.niche;
+    topHooksEl.value = client.top_hooks;
+    lastClientName = client.client_name;
+    applyReadonlyState();
+  }
+
+  function resetResultPanel(): void {
+    if (result) result.hidden = true;
+    if (wall) wall.hidden = true;
+    (window as any).__lastResult = undefined;
+    renderedSheetId = null;
+  }
+
+  /** Switch to a saved client by id (flush-on-switch, reset stale result). */
+  function selectClient(id: string): void {
+    flushAutosave();
+    const client = getClient(id);
+    if (!client) return;
+    loadClientIntoInputs(client);
+    clientSelect.value = id;
+    resetResultPanel();
+    setLastViewed({ clientId: id });
+    setClientStatus(
+      isSampleId(id)
+        ? "Sample client — read-only. Use Duplicate to make an editable copy."
+        : "",
+      isSampleId(id) ? "warn" : undefined,
+    );
+  }
+
+  clientSelect.addEventListener("change", () => {
+    if (clientSelect.value) selectClient(clientSelect.value);
+  });
+
+  // Sample quick-buttons select the matching seeded sample client.
   document.querySelectorAll<HTMLButtonElement>("[data-sample]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const id = btn.dataset.sample;
-      const sample = HOOK_SAMPLES.find((s) => s.id === id);
-      if (sample) {
-        clientNicheEl.value = sample.niche;
-        topHooksEl.value = sample.topHooks;
-        lastClientName = sample.client;
-      }
+      const fixture = HOOK_SAMPLES.find((s) => s.id === btn.dataset.sample);
+      if (!fixture) return;
+      const sampleId = `sample:${fixture.id}`;
+      // Re-seed defensively in case the sample was cleared from storage.
+      let client = getClient(sampleId);
+      if (!client) client = saveClient({ id: sampleId, client_name: fixture.client, niche: fixture.niche, top_hooks: fixture.topHooks, updated_at: "" });
+      populateClientSelect();
+      selectClient(sampleId);
     });
   });
 
+  newClientBtn.addEventListener("click", () => {
+    flushAutosave();
+    currentClientId = crypto.randomUUID();
+    clientNameEl.value = "";
+    clientNicheEl.value = "";
+    topHooksEl.value = "";
+    lastClientName = "";
+    applyReadonlyState();
+    clientSelect.value = "";
+    resetResultPanel();
+    setLastViewed({});
+    setClientStatus("New client — add a name and your niche + hooks save automatically as you edit.", "warn");
+    clientNameEl.focus();
+  });
+
+  dupClientBtn.addEventListener("click", () => {
+    if (!currentClientId || !getClient(currentClientId)) {
+      setClientStatus("Save or pick a client first, then duplicate it.", "warn");
+      return;
+    }
+    const copy = duplicateClient(currentClientId);
+    if (!copy) return;
+    populateClientSelect();
+    loadClientIntoInputs(copy);
+    clientSelect.value = copy.id;
+    resetResultPanel();
+    setLastViewed({ clientId: copy.id });
+    setClientStatus(`Duplicated as "${copy.client_name}" — now editable.`, "saved");
+  });
+
+  delClientBtn.addEventListener("click", async () => {
+    if (!currentClientId) {
+      setClientStatus("No client selected to delete.", "warn");
+      return;
+    }
+    if (isCurrentSample()) {
+      setClientStatus("Sample clients can't be deleted (they re-seed on next visit). Duplicate it first to edit.", "warn");
+      return;
+    }
+    const client = getClient(currentClientId);
+    if (!client) {
+      // Unsaved new client — just discard it.
+      newClientBtn.click();
+      return;
+    }
+    const ok = await openConfirm({
+      title: "Delete this client?",
+      body: `“${client.client_name || "Untitled client"}” will be removed from this device. Saved sheets stay in history.`,
+      confirmText: "Delete",
+    });
+    if (!ok) return;
+    deleteClient(currentClientId);
+    populateClientSelect();
+    resetResultPanel();
+    const remaining = listClients();
+    if (remaining.length > 0) {
+      loadClientIntoInputs(remaining[0]);
+      clientSelect.value = remaining[0].id;
+      setLastViewed({ clientId: remaining[0].id });
+    } else {
+      currentClientId = crypto.randomUUID();
+      clientNameEl.value = "";
+      clientNicheEl.value = "";
+      topHooksEl.value = "";
+      lastClientName = "";
+      applyReadonlyState();
+      clientSelect.value = "";
+      setLastViewed({});
+    }
+    setClientStatus("Client deleted.", "saved");
+  });
+
+  // ─── Autosave (debounced; gated on a client name; samples never save) ──────
+  function readInputsAsClient(): ClientProfile {
+    return {
+      id: currentClientId,
+      client_name: clientNameEl.value,
+      niche: clientNicheEl.value,
+      top_hooks: topHooksEl.value,
+      updated_at: "",
+    };
+  }
+
+  function contentKey(c: ClientProfile): string {
+    return JSON.stringify([c.client_name, c.niche, c.top_hooks]);
+  }
+
+  function scheduleAutosave(): void {
+    if (isCurrentSample()) {
+      setClientStatus("Sample client — read-only. Use Duplicate to make an editable copy.", "warn");
+      return;
+    }
+    if (!currentClientId) return;
+    const draft = readInputsAsClient();
+    if (!draft.client_name.trim()) {
+      if (draft.niche.trim() || draft.top_hooks.trim()) {
+        setClientStatus("Add a client name — niche + hooks save automatically once it's named.", "warn");
+      }
+      return;
+    }
+    const stored = getClient(currentClientId);
+    if (stored && contentKey(stored) === contentKey(draft)) return; // unchanged
+    setClientStatus("Saving…");
+    window.clearTimeout(autosaveTimer);
+    autosaveTimer = window.setTimeout(flushAutosave, 700);
+  }
+
+  /** Persist pending edits immediately. Safe on transitions/unload. */
+  function flushAutosave(): void {
+    window.clearTimeout(autosaveTimer);
+    if (isCurrentSample() || !currentClientId) return;
+    const draft = readInputsAsClient();
+    if (!draft.client_name.trim()) return;
+    const stored = getClient(currentClientId);
+    if (stored && contentKey(stored) === contentKey(draft)) return;
+    const saved = saveClient(draft);
+    lastClientName = saved.client_name;
+    syncClientOption(saved);
+    setClientStatus("✓ Saved automatically", "saved");
+  }
+
+  for (const el of [clientNameEl, clientNicheEl, topHooksEl]) {
+    el.addEventListener("input", scheduleAutosave);
+  }
+
+  // ─── Sheet history ──────────────────────────────────────────────────────
+  function renderHistory(): void {
+    const sheets = listSheets();
+    historyList.innerHTML = "";
+    if (sheets.length === 0) {
+      historySection.hidden = true;
+      return;
+    }
+    historySection.hidden = false;
+    for (const sheet of sheets) {
+      historyList.appendChild(renderHistoryItem(sheet));
+    }
+  }
+
+  function renderHistoryItem(sheet: SavedSheet): HTMLLIElement {
+    const li = document.createElement("li");
+    li.dataset.sheetId = sheet.id;
+
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "history__open";
+    const client = document.createElement("span");
+    client.className = "history__client";
+    client.textContent = sheet.client_name || "Untitled client"; // XSS-safe
+    const meta = document.createElement("span");
+    meta.className = "history__meta";
+    const niche = (sheet.niche || "").replace(/\s+/g, " ").trim();
+    const nicheSnippet = niche.length > 60 ? `${niche.slice(0, 60)}…` : niche;
+    meta.textContent = `${formatTime(sheet.created_at)}${nicheSnippet ? ` · ${nicheSnippet}` : ""}`;
+    open.appendChild(client);
+    open.appendChild(meta);
+    open.addEventListener("click", () => reopenSheet(sheet.id));
+
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "history__del";
+    del.textContent = "Delete";
+    del.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const ok = await openConfirm({
+        title: "Delete this sheet?",
+        body: `The saved hook sheet for “${sheet.client_name || "Untitled client"}” will be permanently removed.`,
+        confirmText: "Delete",
+      });
+      if (!ok) return;
+      deleteSheet(sheet.id);
+      if (renderedSheetId === sheet.id) resetResultPanel();
+      const last = getLastViewed();
+      if (last.sheetId === sheet.id) setLastViewed({ clientId: last.clientId });
+      renderHistory();
+    });
+
+    li.appendChild(open);
+    li.appendChild(del);
+    return li;
+  }
+
+  function formatTime(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "earlier";
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  /** Reopen a saved sheet: restore its input snapshot + render its result. */
+  function reopenSheet(id: string): void {
+    flushAutosave();
+    const sheet = getSheet(id);
+    if (!sheet) return;
+    // Restore the input that produced this sheet so input + output stay coherent.
+    clientNameEl.value = sheet.client_name;
+    clientNicheEl.value = sheet.niche;
+    topHooksEl.value = sheet.top_hooks;
+    lastClientName = sheet.client_name;
+    // Re-anchor to the owning client if it still exists; else treat as ad-hoc.
+    const owner = sheet.client_id ? getClient(sheet.client_id) : undefined;
+    currentClientId = owner ? owner.id : "";
+    clientSelect.value = owner ? owner.id : "";
+    applyReadonlyState();
+    render(sheet.result);
+    renderedSheetId = sheet.id;
+    setLastViewed({ clientId: currentClientId || undefined, sheetId: sheet.id });
+  }
+
+  // ─── Copy buttons ─────────────────────────────────────────────────────────
   document.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const data = (window as any).__lastResult as HookResult | undefined;
@@ -117,7 +688,9 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
     });
   });
 
+  // ─── Generate ─────────────────────────────────────────────────────────────
   submit.addEventListener("click", async () => {
+    if (inFlight) return; // double-submit guard
     const niche = clientNicheEl.value.trim();
     const hooks = topHooksEl.value.trim();
     if (!niche || !hooks) {
@@ -125,6 +698,10 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
       return;
     }
 
+    // Persist any pending client edits before generating (named, non-sample).
+    flushAutosave();
+
+    inFlight = true;
     submit.disabled = true;
     if (hint) hint.textContent = "";
     if (result) result.hidden = true;
@@ -157,8 +734,21 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
       }
 
       if (loading) loading.dataset.stage = "done";
-      (window as any).__lastResult = payload.data;
+      lastClientName = clientNameEl.value.trim() || "your client";
       render(payload.data);
+
+      // Persist the generated sheet so it survives refresh.
+      const sheet = saveSheet({
+        client_id: currentClientId,
+        client_name: clientNameEl.value.trim(),
+        niche,
+        top_hooks: hooks,
+        result: payload.data,
+      });
+      renderedSheetId = sheet.id;
+      setLastViewed({ clientId: currentClientId || undefined, sheetId: sheet.id });
+      renderHistory();
+
       if (hint && Number.isFinite(payload.remaining) && payload.remaining >= 0) {
         hint.textContent =
           payload.remaining > 0
@@ -168,6 +758,7 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
     } catch {
       if (hint) hint.textContent = "Network error. Try again.";
     } finally {
+      inFlight = false;
       submit.disabled = false;
       window.setTimeout(() => {
         if (loading) loading.hidden = true;
@@ -175,9 +766,11 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
     }
   });
 
+  // ─── Result render ──────────────────────────────────────────────────────
   function render(data: HookResult) {
     if (!result) return;
     result.hidden = false;
+    (window as any).__lastResult = data;
 
     const clientEl = result.querySelector('[data-field="client"]') as HTMLElement;
     clientEl.textContent = lastClientName || "your client";
@@ -185,16 +778,17 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
     // Ranked input hooks
     const rankedEl = result.querySelector('[data-field="ranked"]') as HTMLElement;
     rankedEl.innerHTML = "";
-    const rankedSorted = [...data.ranked].sort((a, b) => a.rank - b.rank);
+    const rankedSorted = [...(data.ranked ?? [])].sort((a, b) => a.rank - b.rank);
     rankedSorted.forEach((h) => {
-      rankedEl.appendChild(renderHookLi(h.hook, h.primary_pattern, h.secondary_patterns, h.why_it_works));
+      rankedEl.appendChild(renderHookLi(h.hook, h.primary_pattern, h.secondary_patterns ?? [], h.why_it_works));
     });
 
     // Pattern distribution bars
     const distEl = result.querySelector('[data-field="distribution"]') as HTMLElement;
     distEl.innerHTML = "";
-    const maxCount = Math.max(1, ...data.pattern_distribution.map((p) => p.count));
-    data.pattern_distribution.forEach((p) => {
+    const dist = data.pattern_distribution ?? [];
+    const maxCount = Math.max(1, ...dist.map((p) => p.count));
+    dist.forEach((p) => {
       const li = document.createElement("li");
       const label = document.createElement("span");
       label.className = "bar-label";
@@ -217,7 +811,7 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
     // Blind spots
     const blindEl = result.querySelector('[data-field="blind_spots"]') as HTMLElement;
     blindEl.innerHTML = "";
-    data.blind_spots.forEach((p) => {
+    (data.blind_spots ?? []).forEach((p) => {
       const li = document.createElement("li");
       li.textContent = p;
       blindEl.appendChild(li);
@@ -226,7 +820,7 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
     // New hooks
     const newEl = result.querySelector('[data-field="new_hooks"]') as HTMLElement;
     newEl.innerHTML = "";
-    data.new_hooks.forEach((h) => {
+    (data.new_hooks ?? []).forEach((h) => {
       newEl.appendChild(renderHookLi(h.hook, h.pattern, [], h.why));
     });
 
@@ -265,7 +859,7 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
   }
 
   function formatNewHooks(d: HookResult): string {
-    return d.new_hooks
+    return (d.new_hooks ?? [])
       .map((h, i) => `${i + 1}. ${h.hook}\n   pattern: ${h.pattern}\n   why: ${h.why}`)
       .join("\n\n");
   }
@@ -274,10 +868,10 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
     const lines: string[] = [];
     lines.push("YOUR TOP HOOKS, RANKED");
     lines.push("");
-    [...d.ranked]
+    [...(d.ranked ?? [])]
       .sort((a, b) => a.rank - b.rank)
       .forEach((h) => {
-        const sec = h.secondary_patterns.length ? ` + ${h.secondary_patterns.join(", ")}` : "";
+        const sec = (h.secondary_patterns ?? []).length ? ` + ${h.secondary_patterns.join(", ")}` : "";
         lines.push(`${h.rank}. "${h.hook}"`);
         lines.push(`   pattern: ${h.primary_pattern}${sec}`);
         lines.push(`   why: ${h.why_it_works}`);
@@ -285,20 +879,107 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
       });
 
     lines.push("PATTERN DISTRIBUTION");
-    d.pattern_distribution.forEach((p) => lines.push(`   ${p.pattern}: ${p.count}`));
+    (d.pattern_distribution ?? []).forEach((p) => lines.push(`   ${p.pattern}: ${p.count}`));
     lines.push("");
 
-    lines.push(`BLIND SPOTS: ${d.blind_spots.join(", ")}`);
+    lines.push(`BLIND SPOTS: ${(d.blind_spots ?? []).join(", ")}`);
     lines.push("");
 
     lines.push("20 NEW HOOKS TO FILM");
     lines.push("");
-    d.new_hooks.forEach((h, i) => {
+    (d.new_hooks ?? []).forEach((h, i) => {
       lines.push(`${i + 1}. ${h.hook}`);
       lines.push(`   pattern: ${h.pattern}`);
       lines.push(`   why: ${h.why}`);
       lines.push("");
     });
     return lines.join("\n");
+  }
+
+  // ─── On-brand confirm modal (replaces native confirm()) ───────────────────
+  const confirmEl = document.querySelector("[data-confirm-modal]") as HTMLElement | null;
+  const confirmTitle = confirmEl?.querySelector("[data-confirm-title]") as HTMLElement | null;
+  const confirmBody = confirmEl?.querySelector("[data-confirm-body]") as HTMLElement | null;
+  const confirmOk = confirmEl?.querySelector("[data-confirm-ok]") as HTMLButtonElement | null;
+  let confirmResolve: ((v: boolean) => void) | null = null;
+  let confirmLastFocus: HTMLElement | null = null;
+
+  function closeConfirm(value: boolean): void {
+    if (!confirmEl) return;
+    confirmEl.hidden = true;
+    const resolve = confirmResolve;
+    confirmResolve = null;
+    confirmLastFocus?.focus?.();
+    resolve?.(value);
+  }
+
+  function openConfirm(opts: { title?: string; body: string; confirmText?: string }): Promise<boolean> {
+    if (!confirmEl || !confirmTitle || !confirmBody || !confirmOk) {
+      return Promise.resolve(window.confirm(opts.body)); // graceful fallback
+    }
+    confirmTitle.textContent = opts.title ?? "Are you sure?";
+    confirmBody.textContent = opts.body; // textContent => XSS-safe with user names
+    confirmOk.textContent = opts.confirmText ?? "Confirm";
+    confirmLastFocus = document.activeElement as HTMLElement;
+    confirmEl.hidden = false;
+    (confirmEl.querySelector("button[data-confirm-cancel]") as HTMLButtonElement | null)?.focus();
+    return new Promise((resolve) => { confirmResolve = resolve; });
+  }
+
+  confirmOk?.addEventListener("click", () => closeConfirm(true));
+  confirmEl?.querySelectorAll("[data-confirm-cancel]").forEach((el) =>
+    el.addEventListener("click", () => closeConfirm(false)),
+  );
+  document.addEventListener("keydown", (e) => {
+    if (confirmEl && !confirmEl.hidden && e.key === "Escape") {
+      e.preventDefault();
+      closeConfirm(false);
+    }
+  });
+
+  // ─── Restore last-viewed on load ──────────────────────────────────────────
+  function restoreLastViewed(): void {
+    const last = getLastViewed();
+    if (last.sheetId && getSheet(last.sheetId)) {
+      reopenSheet(last.sheetId);
+      return;
+    }
+    if (last.clientId && getClient(last.clientId)) {
+      loadClientIntoInputs(getClient(last.clientId)!);
+      clientSelect.value = last.clientId;
+      setClientStatus(
+        isSampleId(last.clientId)
+          ? "Sample client — read-only. Use Duplicate to make an editable copy."
+          : "",
+        isSampleId(last.clientId) ? "warn" : undefined,
+      );
+      return;
+    }
+    const clients = listClients();
+    if (clients.length > 0) {
+      loadClientIntoInputs(clients[0]);
+      clientSelect.value = clients[0].id;
+      if (isSampleId(clients[0].id)) {
+        setClientStatus("Sample client — read-only. Use Duplicate to make an editable copy.", "warn");
+      }
+    } else {
+      currentClientId = crypto.randomUUID();
+    }
+  }
+
+  // ─── DEV-only test seam (gated; absent from production builds) ─────────────
+  if (import.meta.env.DEV) {
+    (window as any).__debug = {
+      storage: {
+        seedClientsIfNeeded, listClients, getClient, saveClient, deleteClient,
+        duplicateClient, listSheets, getSheet, saveSheet, deleteSheet,
+        getLastViewed, setLastViewed,
+      },
+      render,
+      reopenSheet,
+      renderHistory,
+      restoreLastViewed,
+      state: () => ({ currentClientId, renderedSheetId, lastClientName }),
+    };
   }
 </script>

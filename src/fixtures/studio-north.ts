@@ -61,3 +61,19 @@ What our pilot study found about combination therapy [190K views]`,
 export function findHookSample(id: string): HookSample | undefined {
   return HOOK_SAMPLES.find((s) => s.id === id);
 }
+
+import type { ClientProfile } from "../lib/hook-storage";
+import { SAMPLE_ID_PREFIX } from "../lib/hook-storage";
+
+/**
+ * The 3 fixtures as read-only sample clients for the persistence library.
+ * Stable `sample:`-prefixed ids let the picker distinguish seeds from
+ * user-created clients and re-resolve a sample on click.
+ */
+export const HOOK_SAMPLE_CLIENTS: ClientProfile[] = HOOK_SAMPLES.map((s) => ({
+  id: `${SAMPLE_ID_PREFIX}${s.id}`,
+  client_name: s.client,
+  niche: s.niche,
+  top_hooks: s.topHooks,
+  updated_at: "",
+}));

@@ -26,7 +26,7 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   // Step 2 — validate input
-  let body: { clientNiche?: string; topHooks?: string };
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
@@ -36,8 +36,15 @@ export const POST: APIRoute = async ({ request }) => {
       message: "Body must be JSON with `clientNiche` and `topHooks` fields.",
     });
   }
-  const clientNiche = (body.clientNiche ?? "").trim();
-  const topHooks = (body.topHooks ?? "").trim();
+  // Guard against non-object bodies (null, number, array, string) and
+  // wrong-typed fields (e.g. a number where a string is expected) — coercing
+  // a non-string with .trim() would otherwise throw a 500.
+  const fields = (body && typeof body === "object" ? body : {}) as {
+    clientNiche?: unknown;
+    topHooks?: unknown;
+  };
+  const clientNiche = typeof fields.clientNiche === "string" ? fields.clientNiche.trim() : "";
+  const topHooks = typeof fields.topHooks === "string" ? fields.topHooks.trim() : "";
   if (!clientNiche || !topHooks) {
     return json<HookResult>({
       ok: false,
