@@ -2,6 +2,7 @@
 // HookResult — three panels: ranked input hooks, blind spots, generated hooks.
 // Client script in /pages/index.astro populates the slots after a successful
 // /api/classify response.
+import { PATTERN_ORDER, PATTERN_GLOSSARY } from "../lib/pattern-glossary";
 ---
 <section class="result" hidden>
   <header class="result__head">
@@ -46,6 +47,32 @@
     </p>
     <ol class="new-hooks" data-field="new_hooks"></ol>
   </article>
+
+  <details class="glossary">
+    <summary class="glossary__summary">
+      <span>The 26 hook patterns, explained</span>
+      <span class="glossary__chev" aria-hidden="true">&rsaquo;</span>
+    </summary>
+    <p class="glossary__lead">
+      Every label above comes from this taxonomy. Tap any pattern chip to see it
+      in place, or skim the full set here.
+    </p>
+    <ul class="glossary__list">
+      {PATTERN_ORDER.map((token) => {
+        const e = PATTERN_GLOSSARY[token];
+        return (
+          <li class="glossary__item" id={`pattern-${token}`}>
+            <p class="glossary__title">
+              {e.title}
+              <code class="glossary__token">{token}</code>
+            </p>
+            <p class="glossary__blurb">{e.blurb}</p>
+            <p class="glossary__example">e.g. &ldquo;{e.example}&rdquo;</p>
+          </li>
+        );
+      })}
+    </ul>
+  </details>
 </section>
 
 <style>
@@ -157,6 +184,26 @@
     color: var(--surface-700);
     border: 1px solid var(--surface-200);
   }
+  /* Interactive chips: subtle "there's more here" affordance, no loud icons. */
+  :global(.pattern-chip[role="button"]),
+  :global(.bar-label[role="button"]),
+  .blind-spots :global(li[role="button"]) {
+    cursor: help;
+    text-decoration: underline dotted;
+    text-decoration-color: oklch(from currentColor l c h / 0.45);
+    text-underline-offset: 2px;
+  }
+  :global(.pattern-chip[role="button"]:hover),
+  :global(.bar-label[role="button"]:hover),
+  .blind-spots :global(li[role="button"]:hover) {
+    text-decoration-color: currentColor;
+  }
+  :global([role="button"].pattern-chip:focus-visible),
+  :global([role="button"].bar-label:focus-visible),
+  .blind-spots :global(li[role="button"]:focus-visible) {
+    outline: 2px solid var(--accent-500);
+    outline-offset: 2px;
+  }
   .ranked :global(.pattern-chip--primary), .new-hooks :global(.pattern-chip--primary) {
     background: oklch(from var(--accent-100) l c h / 0.7);
     color: var(--accent-800);
@@ -231,5 +278,82 @@
     margin-right: 0.4rem;
     color: oklch(from var(--accent-500) l c h / 0.85);
     font-weight: var(--font-weight-semibold);
+  }
+
+  /* ─── Glossary (collapsible "26 patterns, explained") ───────────────── */
+  .glossary {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--surface-200);
+  }
+  .glossary__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    cursor: pointer;
+    list-style: none;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--surface-900);
+  }
+  .glossary__summary::-webkit-details-marker { display: none; }
+  .glossary__chev {
+    font-family: var(--font-mono);
+    color: var(--surface-500);
+    transition: transform var(--duration-base, 0.18s) var(--ease-smooth, ease);
+  }
+  .glossary[open] .glossary__chev { transform: rotate(90deg); }
+  .glossary__lead {
+    margin: 0.75rem 0 1rem;
+    font-size: var(--text-sm);
+    color: var(--surface-500);
+    max-width: 60ch;
+  }
+  .glossary__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem 1.5rem;
+  }
+  @media (max-width: 640px) {
+    .glossary__list { grid-template-columns: 1fr; }
+  }
+  .glossary__item {
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid var(--surface-150);
+  }
+  .glossary__title {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0 0 0.25rem;
+    font-weight: var(--font-weight-semibold);
+    color: var(--surface-900);
+  }
+  .glossary__token {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--accent-700);
+    background: oklch(from var(--accent-100) l c h / 0.6);
+    border: 1px solid oklch(from var(--accent-500) l c h / 0.3);
+    border-radius: var(--radius-sm, 4px);
+    padding: 0.05rem 0.4rem;
+  }
+  .glossary__blurb {
+    margin: 0 0 0.2rem;
+    font-size: var(--text-sm);
+    color: var(--surface-700);
+    line-height: var(--leading-normal);
+  }
+  .glossary__example {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--surface-500);
+    font-style: italic;
   }
 </style>

@@ -110,6 +110,15 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
 
   <RateLimitWall repoUrl={REPO_URL} />
 
+  <!-- Pattern explainer popover — opens on clicking any pattern chip. -->
+  <div class="pattern-pop" data-pattern-pop hidden role="dialog" aria-label="Hook pattern explanation">
+    <button type="button" class="pattern-pop__close" data-pattern-pop-close aria-label="Close">&times;</button>
+    <p class="pattern-pop__title" data-pattern-pop-title></p>
+    <code class="pattern-pop__token" data-pattern-pop-token></code>
+    <p class="pattern-pop__blurb" data-pattern-pop-blurb></p>
+    <p class="pattern-pop__example" data-pattern-pop-example></p>
+  </div>
+
   <!-- Confirmation modal — replaces native confirm() for destructive actions. -->
   <div class="confirm" data-confirm-modal hidden>
     <div class="confirm__backdrop" data-confirm-cancel></div>
@@ -299,12 +308,69 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
     color: var(--surface-0);
   }
   .confirm__danger:hover { background: var(--accent-700); color: var(--surface-0); }
+
+  /* ── Pattern explainer popover ──────────────────────────────────────── */
+  .pattern-pop {
+    position: fixed;
+    z-index: 1100;
+    width: min(20rem, calc(100vw - 1.5rem));
+    background: var(--surface-0);
+    border: 1px solid var(--surface-300);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-xl, var(--shadow-card));
+    padding: 0.9rem 1rem 1rem;
+  }
+  .pattern-pop[hidden] { display: none; }
+  .pattern-pop__close {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.45rem;
+    background: none;
+    border: 0;
+    font-size: 1.2rem;
+    line-height: 1;
+    color: var(--surface-500);
+    cursor: pointer;
+    padding: 0.2rem 0.35rem;
+    border-radius: var(--radius-sm, 4px);
+  }
+  .pattern-pop__close:hover { color: var(--surface-900); background: var(--surface-100); }
+  .pattern-pop__title {
+    font-family: var(--font-display);
+    font-weight: var(--font-weight-semibold);
+    font-size: var(--text-base);
+    color: var(--surface-900);
+    margin: 0 1.5rem 0.15rem 0;
+  }
+  .pattern-pop__token {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--accent-700);
+    background: oklch(from var(--accent-100) l c h / 0.6);
+    border: 1px solid oklch(from var(--accent-500) l c h / 0.3);
+    border-radius: var(--radius-sm, 4px);
+    padding: 0.05rem 0.4rem;
+  }
+  .pattern-pop__blurb {
+    margin: 0.55rem 0 0.35rem;
+    font-size: var(--text-sm);
+    color: var(--surface-700);
+    line-height: var(--leading-normal);
+  }
+  .pattern-pop__example {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--surface-500);
+    font-style: italic;
+  }
+  .pattern-pop__example:empty { display: none; }
 </style>
 
 <script>
   import { HOOK_SAMPLES, HOOK_SAMPLE_CLIENTS } from "../fixtures/studio-north";
   import type { HookResult } from "../lib/hook-types";
   import type { ApiResponse } from "../lib/types";
+  import { patternEntry } from "../lib/pattern-glossary";
   import {
     seedClientsIfNeeded,
     listClients,
@@ -793,6 +859,7 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
       const label = document.createElement("span");
       label.className = "bar-label";
       label.textContent = p.pattern;
+      makeChipInteractive(label, p.pattern);
       const count = document.createElement("span");
       count.className = "bar-count";
       count.textContent = String(p.count);
@@ -814,6 +881,7 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
     (data.blind_spots ?? []).forEach((p) => {
       const li = document.createElement("li");
       li.textContent = p;
+      makeChipInteractive(li, p);
       blindEl.appendChild(li);
     });
 
@@ -842,11 +910,13 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
     const primaryChip = document.createElement("span");
     primaryChip.className = "pattern-chip pattern-chip--primary";
     primaryChip.textContent = primary;
+    makeChipInteractive(primaryChip, primary);
     meta.appendChild(primaryChip);
     secondary.forEach((s) => {
       const chip = document.createElement("span");
       chip.className = "pattern-chip";
       chip.textContent = s;
+      makeChipInteractive(chip, s);
       meta.appendChild(chip);
     });
     const w = document.createElement("p");
@@ -936,6 +1006,88 @@ const REPO_URL = "https://github.com/Voxlabs-Live/hook-sheet";
       closeConfirm(false);
     }
   });
+
+  // ─── Pattern explainer popover ────────────────────────────────────────────
+  // Every pattern chip (ranked, distribution, blind spots, new hooks) opens a
+  // small in-context card with a plain-English definition + example. The full
+  // set also lives in the collapsible glossary under the result.
+  const patternPop = document.querySelector("[data-pattern-pop]") as HTMLElement | null;
+  const popTitle = patternPop?.querySelector("[data-pattern-pop-title]") as HTMLElement | null;
+  const popToken = patternPop?.querySelector("[data-pattern-pop-token]") as HTMLElement | null;
+  const popBlurb = patternPop?.querySelector("[data-pattern-pop-blurb]") as HTMLElement | null;
+  const popExample = patternPop?.querySelector("[data-pattern-pop-example]") as HTMLElement | null;
+  let popAnchor: HTMLElement | null = null;
+
+  /** Turn a chip/label into a keyboard- and pointer-accessible explainer trigger. */
+  function makeChipInteractive(el: HTMLElement, token: string): void {
+    const entry = patternEntry(token);
+    el.setAttribute("role", "button");
+    el.setAttribute("tabindex", "0");
+    el.setAttribute("aria-label", `What is ${entry.title}?`);
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openPatternPopover(token, el);
+    });
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openPatternPopover(token, el);
+      }
+    });
+  }
+
+  function openPatternPopover(token: string, anchor: HTMLElement): void {
+    if (!patternPop || !popTitle || !popToken || !popBlurb || !popExample) return;
+    const e = patternEntry(token);
+    popTitle.textContent = e.title;
+    popToken.textContent = e.token;
+    popBlurb.textContent = e.blurb;
+    popExample.textContent = e.example ? `e.g. “${e.example}”` : ""; // textContent => XSS-safe
+    popAnchor = anchor;
+    patternPop.hidden = false;
+    positionPatternPop(anchor);
+    (patternPop.querySelector("[data-pattern-pop-close]") as HTMLButtonElement | null)?.focus();
+  }
+
+  function closePatternPopover(returnFocus = true): void {
+    if (!patternPop || patternPop.hidden) return;
+    patternPop.hidden = true;
+    const a = popAnchor;
+    popAnchor = null;
+    if (returnFocus) a?.focus?.();
+  }
+
+  function positionPatternPop(anchor: HTMLElement): void {
+    if (!patternPop) return;
+    const r = anchor.getBoundingClientRect();
+    const pw = patternPop.offsetWidth;
+    const ph = patternPop.offsetHeight;
+    let left = r.left;
+    if (left + pw > window.innerWidth - 12) left = window.innerWidth - 12 - pw;
+    if (left < 12) left = 12;
+    let top = r.bottom + 8;
+    if (top + ph > window.innerHeight - 12) top = r.top - 8 - ph; // flip above
+    if (top < 12) top = 12;
+    patternPop.style.left = `${left}px`;
+    patternPop.style.top = `${top}px`;
+  }
+
+  patternPop?.querySelector("[data-pattern-pop-close]")?.addEventListener("click", () => closePatternPopover());
+  // Click anywhere outside closes it (chip clicks stopPropagation, so they don't).
+  document.addEventListener("click", (e) => {
+    if (patternPop && !patternPop.hidden && !patternPop.contains(e.target as Node)) {
+      closePatternPopover(false);
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (patternPop && !patternPop.hidden && e.key === "Escape") {
+      e.preventDefault();
+      closePatternPopover();
+    }
+  });
+  // A floating fixed popover would drift on scroll/resize — just close it.
+  window.addEventListener("scroll", () => closePatternPopover(false), true);
+  window.addEventListener("resize", () => closePatternPopover(false));
 
   // ─── Restore last-viewed on load ──────────────────────────────────────────
   function restoreLastViewed(): void {
